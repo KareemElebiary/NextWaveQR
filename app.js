@@ -62,20 +62,13 @@ async function handleScannedData(raw) {
   }
 
   try {
-    const response = await fetch(APPS_SCRIPT_URL, {
+    await fetch(APPS_SCRIPT_URL, {
       method: "POST",
+      mode: "no-cors",
       headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({ email: payload.email })
     });
-    const responseText = await response.text();
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (_) {
-      throw new Error(`Server returned an invalid response (${response.status})`);
-    }
-    if (!response.ok) throw new Error(data.msg || `Server returned ${response.status}`);
-    showStatus(data.ok ? "✅ " + data.msg : "⚠️ " + (data.msg || "Attendee was not found"), data.ok ? "success" : "error");
+    showStatus("✅ Attendance request sent. Check the sheet to confirm.", "success");
   } catch (error) {
     console.error(error);
     showStatus("Network error: " + error.message, "error");
