@@ -45,13 +45,15 @@ def main() -> None:
             if not attendee_id or not email:
                 continue
 
+            reference = collection.document(attendee_id)
             data = {
                 "email": email,
                 "name": str(row.get("name", "")).strip(),
                 "ieeeMember": as_bool(row.get("ieee_member", "false")),
-                "attended": as_bool(row.get("attended", "false")),
             }
-            batch.set(collection.document(attendee_id), data, merge=True)
+            if not reference.get().exists:
+                data["attended"] = as_bool(row.get("attended", "false"))
+            batch.set(reference, data, merge=True)
             imported += 1
 
             if imported % BATCH_SIZE == 0:
