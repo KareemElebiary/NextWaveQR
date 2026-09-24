@@ -1,8 +1,16 @@
-// QR scanner front-end logic.
-import { APPS_SCRIPT_URL } from "./config.js";
-
 const statusBox = document.getElementById("status");
+const fileInput = document.getElementById("registry-file");
+const downloadButton = document.getElementById("download-button");
+const fileNameBox = document.getElementById("file-name");
+const recordCountBox = document.getElementById("record-count");
+const matchCountBox = document.getElementById("match-count");
+const recordsHead = document.getElementById("records-head");
+const recordsBody = document.getElementById("records-body");
 let isProcessing = false;
+let scanner = null;
+let registryRows = [];
+let registryHeaders = [];
+let loadedFileName = "attendees.csv";
 
 function showStatus(message, type = "info") {
   statusBox.textContent = message;
@@ -11,47 +19,71 @@ function showStatus(message, type = "info") {
   else if (type === "error") statusBox.classList.add("error");
 }
 
-function requestAttendanceJsonp(email) {
-  return new Promise((resolve, reject) => {
-    const callbackName = "attendanceCallback_" + Date.now();
-    const script = document.createElement("script");
-    const cleanup = () => {
-      delete window[callbackName];
-      script.remove();
-    };
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error("Attendance server timed out"));
-    }, 10000);
+function normalize(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
 
-    window[callbackName] = (data) => {
-      clearTimeout(timeout);
-      cleanup();
-      resolve(data);
-    };
-    script.onerror = () => {
-      clearTimeout(timeout);
-      cleanup();
-      reject(new Error("Attendance server could not be reached"));
-    };
-    script.src = `${APPS_SCRIPT_URL}?email=${encodeURIComponent(email)}&callback=${callbackName}`;
-    document.body.appendChild(script);
+function showTable() {
+  recordsHead.replaceChildren();
+  recordsBody.replaceChildren();
+  registryHeaders.forEach((header) => {
+    const cell = document.createElement("th");
+    cell.textContent = header;
+    recordsHead.appendChild(cell);
+  });
+  registryRows.slice(0, 25).forEach((row) => {
+    const tableRow = document.createElement("tr");
+    registryHeaders.forEach((header) => {
+      const cell = document.createElement("td");
+      cell.textContent = row[header] ?? "";
+      tableRow.appendChild(cell);
+    });
+    recordsBody.appendChild(tableRow);
   });
 }
 
-async function requestAttendance(email) {
+function updateSummary() {
+  const checkedCount = registryRows.filter((row) => normalize(row.Attended) === "yes" || normalize(row.Attended) === "true").length;
+  fileNameBox.textContent = loadedFileName;
+  recordCountBox.textContent = `${registryRows.length} attendees loaded`;
+  matchCountBox.textContent = `${checkedCount} checked in`;
+  downloadButton.disabled = registryRows.length === 0;
+}
+
+function parsePayload(raw) {
   try {
-    return await requestAttendanceJsonp(email);
-  } catch (error) {
-    console.warn("Row confirmation unavailable; sending attendance POST", error);
-    await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ email })
-    });
-    return { ok: true, fallback: true };
+    return JSON.parse(raw);
+  } catch (_) {
+    const emailMatch = raw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    return emailMatch ? { email: emailMatch[0] } : null;
   }
+}
+
+function findAttendee(payload) {
+  const payloadId = normalize(payload.id);
+  const payloadEmail = normalize(payload.email);
+  return registryRows.find((row) => payloadId && normalize(row.ID) === payloadId)
+    || registryRows.find((row) => payloadEmail && normalize(row.Email) === payloadEmail);
+}
+
+function loadRegistry(file) {
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      if (results.errors.length) {
+        showStatus("Could not read the CSV: " + results.errors[0].message, "error");
+        return;
+      }
+      registryRows = results.data;
+      registryHeaders = results.meta.fields || [];
+      loadedFileName = file.name;
+      showTable();
+      updateSummary();
+      showStatus("CSV loaded. Point the camera at an attendee QR code.");
+      startScanner();
+    }
+  });
 }
 
 function onScanSuccess(decodedText) {
@@ -61,6 +93,7 @@ function onScanSuccess(decodedText) {
 }
 
 async function startScanner() {
+  if (scanner || !registryRows.length) return;
   try {
     if (!window.isSecureContext) {
       throw new Error("Camera access requires HTTPS or localhost");
@@ -69,14 +102,14 @@ async function startScanner() {
       throw new Error("QR scanner library failed to load");
     }
 
-    const scanner = new Html5Qrcode("reader");
+    scanner = new Html5Qrcode("reader");
     await scanner.start(
       { facingMode: "environment" },
       { fps: 10, qrbox: { width: 250, height: 250 } },
       onScanSuccess,
       () => {}
     );
-    showStatus("Point the camera at the QR code");
+    showStatus("Point the camera at the attendee QR code");
   } catch (error) {
     console.error(error);
     showStatus("Camera error: " + error.message, "error");
@@ -84,41 +117,48 @@ async function startScanner() {
 }
 
 async function handleScannedData(raw) {
-  showStatus("Verifying attendance...");
-  let payload;
-  try {
-    payload = JSON.parse(raw);
-  } catch (_) {
-    const emailMatch = raw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-    if (!emailMatch) {
-      showStatus("Unable to parse QR payload", "error");
-      isProcessing = false;
-      return;
-    }
-    payload = { email: emailMatch[0] };
-  }
-
-  if (!payload.email) {
-    showStatus("QR does not contain an email", "error");
+  const payload = parsePayload(raw);
+  if (!payload) {
+    showStatus("Unable to read attendee details from this QR code", "error");
     isProcessing = false;
     return;
   }
 
-  try {
-    const result = await requestAttendance(payload.email);
-    if (!result.ok) throw new Error(result.msg || "Attendance was not accepted");
-    showStatus(result.fallback
-      ? "✅ Attendance request sent. Check the sheet to confirm."
-      : `✅ ${result.name} found in row ${result.row}. Attendance confirmed.`, "success");
-  } catch (error) {
-    console.error(error);
-    showStatus("Network error: " + error.message, "error");
+  const attendee = findAttendee(payload);
+  if (!attendee) {
+    showStatus("Attendee was not found in the loaded CSV", "error");
+    isProcessing = false;
+    return;
+  }
+
+  const rowNumber = registryRows.indexOf(attendee) + 2;
+  if (normalize(attendee.Attended) === "yes" || normalize(attendee.Attended) === "true") {
+    showStatus(`Already checked in: ${attendee.Name || attendee.Email} (row ${rowNumber})`, "success");
+  } else {
+    attendee.Attended = "Yes";
+    attendee.Check_In_Time = new Date().toISOString();
+    showTable();
+    updateSummary();
+    showStatus(`Checked in: ${attendee.Name || attendee.Email} (row ${rowNumber})`, "success");
   }
 
   setTimeout(() => {
     isProcessing = false;
-    showStatus("Point the camera at the QR code");
+    showStatus("Point the camera at the attendee QR code");
   }, 3000);
 }
 
+function downloadRegistry() {
+  const csv = Papa.unparse({ fields: registryHeaders, data: registryRows });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  link.download = loadedFileName.replace(/\.csv$/i, "") + "_attended.csv";
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+fileInput.addEventListener("change", () => {
+  if (fileInput.files[0]) loadRegistry(fileInput.files[0]);
+});
+downloadButton.addEventListener("click", downloadRegistry);
 window.addEventListener("DOMContentLoaded", startScanner);

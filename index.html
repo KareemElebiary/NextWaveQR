@@ -3,18 +3,45 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IEEE QR Attendance Scanner</title>
+  <title>IEEE Attendance Desk</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.3/papaparse.min.js"></script>
 </head>
 <body>
   <main class="container">
-    <h1>IEEE Attendance Scanner</h1>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">IEEE Computer Society</p>
+        <h1>Attendance Desk</h1>
+      </div>
+      <div class="file-actions">
+        <label class="file-picker" for="registry-file">Load attendees CSV</label>
+        <input id="registry-file" type="file" accept=".csv,text/csv" />
+        <button id="download-button" type="button" disabled>Download updated CSV</button>
+      </div>
+    </header>
+    <section class="summary" aria-live="polite">
+      <strong id="file-name">No attendees file loaded</strong>
+      <span id="record-count">Load the CSV file before scanning.</span>
+    </section>
     <div id="reader" class="video-box"></div>
-    <div id="status" class="status-box">📸 Point the camera at the QR code</div>
+    <div id="status" class="status-box">Load your attendees CSV to begin.</div>
+    <section class="records-panel">
+      <div class="panel-heading">
+        <h2>Attendance records</h2>
+        <span id="match-count">0 checked in</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead id="records-head"></thead>
+          <tbody id="records-body"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
   <script src="app.js?v=3" type="module"></script>
 </body>
