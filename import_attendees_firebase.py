@@ -39,10 +39,14 @@ def main() -> None:
     imported = 0
 
     with csv_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
-        for row in csv.DictReader(csv_file):
-            attendee_id = str(row.get("id", "")).strip()
+        for row_number, raw_row in enumerate(csv.DictReader(csv_file), start=1001):
+            row = {
+                str(key).strip().lower(): str(value or "").strip()
+                for key, value in raw_row.items()
+            }
+            attendee_id = str(row.get("id", "")).strip() or str(row_number)
             email = str(row.get("email", "")).strip().lower()
-            if not attendee_id or not email:
+            if not email:
                 continue
 
             reference = collection.document(attendee_id)
