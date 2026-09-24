@@ -586,7 +586,8 @@ class IEEEEventApp(tk.Tk):
                 )
                 self.after(0, lambda: self.on_gen_success(res))
             except Exception as e:
-                self.after(0, lambda: self.on_gen_error(str(e)))
+                error_message = str(e)
+                self.after(0, lambda message=error_message: self.on_gen_error(message))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -671,7 +672,8 @@ class IEEEEventApp(tk.Tk):
                 )
                 self.after(0, lambda: self.on_test_success(test_to))
             except Exception as e:
-                self.after(0, lambda: self.on_mail_error(str(e)))
+                error_message = str(e)
+                self.after(0, lambda message=error_message: self.on_mail_error(message))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -743,7 +745,8 @@ class IEEEEventApp(tk.Tk):
                 )
                 self.after(0, lambda: self.on_batch_success(res))
             except Exception as e:
-                self.after(0, lambda: self.on_mail_error(str(e)))
+                error_message = str(e)
+                self.after(0, lambda message=error_message: self.on_mail_error(message))
 
         threading.Thread(target=worker, daemon=True).start()
 
