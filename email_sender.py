@@ -355,9 +355,18 @@ def batch_send_passes(
     # If running in test mode: only send 1 email to the test address!
     if test_mode_email:
         print(f"\n[TEST MODE] Sending 1 sample pass to: {test_mode_email}")
-        first_row = df.iloc[0]
-        pass_id = str(first_row.get("ID", "1001"))
-        badge_name = str(first_row.get("Badge_File", ""))
+        requested_email = test_mode_email.strip().lower()
+        email_matches = df[
+            df["Email"].fillna("").astype(str).str.strip().str.lower() == requested_email
+        ]
+        test_row = email_matches.iloc[0] if not email_matches.empty else df.iloc[0]
+        if email_matches.empty:
+            print("[TEST MODE] Recipient is not in the registry; using the first pass as a sample.")
+
+        pass_id = str(test_row.get("ID", "1001"))
+        attendee_name = str(test_row.get("Name", "Test Attendee")).strip()
+        is_ieee = str(test_row.get("IEEE_Member", "")).strip().lower() in {"yes", "true", "1"}
+        badge_name = str(test_row.get("Badge_File", ""))
         badge_path = b_dir / badge_name
 
         server = connect_smtp(smtp_host, smtp_port, sender_email, sender_password)
@@ -366,10 +375,10 @@ def batch_send_passes(
                 smtp_server=server,
                 sender_email=sender_email,
                 sender_name=sender_name,
-                attendee_name="Test Attendee (Kareem)",
+                attendee_name=attendee_name,
                 attendee_email=test_mode_email,
                 pass_id=pass_id,
-                is_ieee=True,
+                is_ieee=is_ieee,
                 badge_path=str(badge_path),
                 event_name=event_name
             )
