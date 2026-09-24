@@ -1,5 +1,9 @@
 // QR scanner front-end logic.
-import { APPS_SCRIPT_URL } from "./config.js?v=6";
+import { FIREBASE_CONFIG } from "./config.js?v=7";
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
 const statusBox = document.getElementById("status");
 const startButton = document.getElementById("start-camera");
@@ -27,36 +31,37 @@ function cameraErrorMessage(error) {
   return message || "The browser could not open the camera.";
 }
 
-function requestAttendanceJsonp(email) {
-  return new Promise((resolve, reject) => {
-    const callbackName = "attendanceCallback_" + Date.now();
-    const script = document.createElement("script");
-    const cleanup = () => {
-      delete window[callbackName];
-      script.remove();
-    };
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error("Attendance server timed out"));
-    }, 10000);
-
-    window[callbackName] = (data) => {
-      clearTimeout(timeout);
-      cleanup();
-      resolve(data);
-    };
-    script.onerror = () => {
-      clearTimeout(timeout);
-      cleanup();
-      reject(new Error("Attendance server could not be reached"));
-    };
-    script.src = `${APPS_SCRIPT_URL}?email=${encodeURIComponent(email)}&callback=${callbackName}`;
-    document.body.appendChild(script);
-  });
-}
-
 async function requestAttendance(email) {
-  return requestAttendanceJsonp(email);
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return { ok: false, msg: "Email is required" };
+
+  await auth.signInAnonymously();
+  const matches = await db.collection("attendees")
+    .where("email", "==", normalizedEmail)
+    .limit(10)
+    .get();
+  if (matches.empty) return { ok: false, msg: "Attendee not found" };
+
+  return db.runTransaction(async (transaction) => {
+    const documents = [];
+    for (const document of matches.docs) {
+      documents.push({ ref: document.ref, data: (await transaction.get(document.ref)).data() });
+    }
+
+    const available = documents.find((document) => {
+      const attended = document.data.attended;
+      return attended !== true && String(attended).trim().toLowerCase() !== "true";
+    });
+    const selected = available || documents[0];
+    const name = String(selected.data.name || normalizedEmail).trim();
+    if (!available) return { ok: true, msg: "Already checked in", name: name };
+
+    transaction.update(selected.ref, {
+      attended: true,
+      checkInTime: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return { ok: true, msg: "Attendance marked", name: name };
+  });
 }
 
 function onScanSuccess(decodedText) {
@@ -123,7 +128,7 @@ async function handleScannedData(raw) {
   try {
     const result = await requestAttendance(payload.email);
     if (!result.ok) throw new Error(result.msg || "Attendance was not accepted");
-    showStatus(`✅ ${result.name} found in row ${result.row}. Attendance confirmed.`, "success");
+    showStatus(`✅ ${result.name} found. Attendance confirmed.`, "success");
   } catch (error) {
     console.error(error);
     showStatus("Network error: " + error.message, "error");
