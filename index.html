@@ -3,20 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="refresh" content="0; url=scanner/" />
   <title>IEEE QR Attendance Scanner</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main class="container">
-    <h1>IEEE Attendance Scanner</h1>
-    <div id="video-container" class="video-box">
-      <video id="video" playsinline></video>
-    </div>
-    <div id="status" class="status-box">📸 Point the camera at the QR code</div>
-  </main>
-  <script src="app.js" type="module"></script>
+  <p>Opening the scanner...</p>
+  <p><a href="scanner/">Open the scanner</a></p>
+  <script>
+    window.location.replace("scanner/");
+  </script>
 </body>
 </html>
