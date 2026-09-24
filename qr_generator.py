@@ -266,17 +266,22 @@ def process_attendees(
     print(f"Detected columns: Name='{col_map['name']}', Number='{col_map.get('number', 'N/A')}', IEEE='{col_map.get('ieee', 'N/A')}', Email='{col_map.get('email', 'N/A')}'")
     print(f"Output directory: {out_dir.resolve()}\n")
 
-    for i, (_, row) in enumerate(df.iterrows()):
+    attendee_index = 0
+    for _, row in df.iterrows():
         name = str(row[col_map['name']]).strip()
         number = str(row[col_map['number']]).strip() if 'number' in col_map else ""
         is_ieee = parse_ieee_status(row[col_map['ieee']]) if 'ieee' in col_map else False
         email = str(row[col_map['email']]).strip() if 'email' in col_map and not pd.isna(row[col_map['email']]) else ""
+        if not name or name.lower() == "nan" or not email or email.lower() == "nan":
+            print(" [Skipped] Incomplete attendee row")
+            continue
 
         # Unique ID: Purely numeric (e.g. 1001, 1002...) or use existing numeric ID
         if 'id' in col_map and not pd.isna(row[col_map['id']]) and str(row[col_map['id']]).strip().isdigit():
             attendee_id = str(row[col_map['id']]).strip()
         else:
-            attendee_id = str(1001 + i)
+            attendee_id = str(1001 + attendee_index)
+        attendee_index += 1
 
         # Clean name for filenames
         clean_name = sanitize_filename(name)
@@ -338,7 +343,7 @@ def process_attendees(
         })
 
         ieee_label = "[IEEE Member]" if is_ieee else "[Non-Member]"
-        print(f" [{i + 1}/{total}] Generated Pass #{attendee_id}: {name} {ieee_label}")
+        print(f" [{len(records)}/{total}] Generated Pass #{attendee_id}: {name} {ieee_label}")
 
     # 3. Export Registry CSV (Perfect for importing into Google Sheets)
     registry_df = pd.DataFrame(records)
