@@ -1,2 +1,2 @@
-// Apps Script web app endpoint used to mark attendance in Google Sheets.
-export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyG42eqJ5wFOgFy2zxyCO9t5egimv6Ut3y2iRiLvoX1ROkV-fBBKS50Bmyecd9O4Nvq8w/exec";
+// config.js – replace with your Apps Script Web App URL
+export const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyNt9N-7bxdAlLREAaW2FEMXdzkqMBGcj_imf0vn2ceYY14nhlq78J4kahEpHTINIZ-HA/exec";
