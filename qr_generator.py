@@ -63,12 +63,10 @@ def detect_columns(df: pd.DataFrame) -> dict:
         if matched:
             col_mapping[key] = matched
 
-    # Sanity check: name and number are the primary identifiers
+    # Name is required; phone/number is optional for email-based QR passes.
     missing = []
     if 'name' not in col_mapping:
         missing.append('Name')
-    if 'number' not in col_mapping:
-        missing.append('Number/Phone')
 
     if missing:
         raise ValueError(
@@ -265,12 +263,12 @@ def process_attendees(
     total = len(df)
 
     print(f"\nProcessing {total} attendees from: {csv_file.name}")
-    print(f"Detected columns: Name='{col_map['name']}', Number='{col_map['number']}', IEEE='{col_map.get('ieee', 'N/A')}', Email='{col_map.get('email', 'N/A')}'")
+    print(f"Detected columns: Name='{col_map['name']}', Number='{col_map.get('number', 'N/A')}', IEEE='{col_map.get('ieee', 'N/A')}', Email='{col_map.get('email', 'N/A')}'")
     print(f"Output directory: {out_dir.resolve()}\n")
 
     for i, (_, row) in enumerate(df.iterrows()):
         name = str(row[col_map['name']]).strip()
-        number = str(row[col_map['number']]).strip()
+        number = str(row[col_map['number']]).strip() if 'number' in col_map else ""
         is_ieee = parse_ieee_status(row[col_map['ieee']]) if 'ieee' in col_map else False
         email = str(row[col_map['email']]).strip() if 'email' in col_map and not pd.isna(row[col_map['email']]) else ""
 
