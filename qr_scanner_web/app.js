@@ -3,8 +3,10 @@
 import { APPS_SCRIPT_URL } from "./config.js";
 
 const statusBox = document.getElementById("status");
+const startButton = document.getElementById("start-camera");
 let html5QrCode = null;
 let isProcessing = false;
+let isStarting = false;
 
 function showStatus(message, type = "info") {
   statusBox.textContent = message;
@@ -37,9 +39,16 @@ function onScanSuccess(decodedText) {
 }
 
 async function startScanner() {
+  if (isStarting || html5QrCode) return;
+  isStarting = true;
+  startButton.disabled = true;
+  showStatus("Requesting camera permission...");
   try {
     if (!window.isSecureContext) {
       throw new Error("Camera access requires HTTPS or localhost");
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("This browser does not support camera access");
     }
     if (!window.Html5Qrcode) {
       throw new Error("QR scanner library failed to load");
@@ -55,7 +64,10 @@ async function startScanner() {
     showStatus("📸 Point the camera at the QR code");
   } catch (e) {
     console.error(e);
-    showStatus("❌ Camera error: " + e.message, "error");
+    startButton.disabled = false;
+    showStatus("❌ Camera error: " + e.message + ". Tap Start camera and allow permission.", "error");
+  } finally {
+    isStarting = false;
   }
 }
 
@@ -96,5 +108,5 @@ async function handleScannedData(raw) {
   }, 3000);
 }
 
-// Initialize on page load
+startButton.addEventListener("click", startScanner);
 window.addEventListener("DOMContentLoaded", startScanner);
