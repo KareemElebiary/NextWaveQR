@@ -11,6 +11,34 @@ function showStatus(message, type = "info") {
   else if (type === "error") statusBox.classList.add("error");
 }
 
+function requestAttendance(email) {
+  return new Promise((resolve, reject) => {
+    const callbackName = "attendanceCallback_" + Date.now();
+    const script = document.createElement("script");
+    const cleanup = () => {
+      delete window[callbackName];
+      script.remove();
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error("Attendance server timed out"));
+    }, 10000);
+
+    window[callbackName] = (data) => {
+      clearTimeout(timeout);
+      cleanup();
+      resolve(data);
+    };
+    script.onerror = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error("Attendance server could not be reached"));
+    };
+    script.src = `${APPS_SCRIPT_URL}?email=${encodeURIComponent(email)}&callback=${callbackName}`;
+    document.body.appendChild(script);
+  });
+}
+
 function onScanSuccess(decodedText) {
   if (isProcessing) return;
   isProcessing = true;
@@ -62,13 +90,9 @@ async function handleScannedData(raw) {
   }
 
   try {
-    await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ email: payload.email })
-    });
-    showStatus("✅ Attendance request sent. Check the sheet to confirm.", "success");
+    const result = await requestAttendance(payload.email);
+    if (!result.ok) throw new Error(result.msg || "Attendance was not accepted");
+    showStatus(`✅ ${result.name} found in row ${result.row}. Attendance confirmed.`, "success");
   } catch (error) {
     console.error(error);
     showStatus("Network error: " + error.message, "error");
