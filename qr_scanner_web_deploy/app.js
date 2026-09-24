@@ -1,5 +1,5 @@
 // QR scanner front-end logic.
-import { APPS_SCRIPT_URL } from "./config.js?v=6";
+import { APPS_SCRIPT_URL } from "./config.js";
 
 const statusBox = document.getElementById("status");
 const startButton = document.getElementById("start-camera");
